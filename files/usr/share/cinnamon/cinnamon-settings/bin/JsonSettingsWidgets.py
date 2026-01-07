@@ -42,7 +42,7 @@ OPERATIONS = ['<=', '>=', '<', '>', '!=', '=']
 OPERATIONS_MAP = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge, '!=': operator.ne, '=': operator.eq}
 
 class JSONSettingsHandler(object):
-    def __init__(self, filepath, notify_callback=None):
+    def __init__(self, filepath, uuid = None, instance_id = None, notify_callback=None):
         super(JSONSettingsHandler, self).__init__()
 
         self.notify_callback = notify_callback
@@ -54,6 +54,8 @@ class JSONSettingsHandler(object):
         self.bindings = {}
         self.listeners = {}
         self.deps = {}
+        self.uuid = uuid
+        self.instance_id = instance_id
 
         self.timeout_id = 0
         self.file_monitor_id = 0
@@ -174,7 +176,7 @@ class JSONSettingsHandler(object):
         try:
             settings = json.loads(raw_data, object_pairs_hook=collections.OrderedDict)
         except:
-            raise Exception("Failed to parse settings JSON data for file %s" % self.filepath)
+            raise Exception(f"Failed to parse settings JSON data for file {self.filepath}")
         return settings
 
     def save_settings(self):
@@ -194,6 +196,8 @@ class JSONSettingsHandler(object):
                 self.do_key_update(key)
 
         self.save_settings()
+        if self.notify_callback:
+            self.notify_callback(self, "", "")
 
     def do_key_update(self, key):
         if key in self.bindings:
@@ -211,7 +215,7 @@ class JSONSettingsHandler(object):
         try:
             settings = json.loads(raw_data, object_pairs_hook=collections.OrderedDict)
         except:
-            raise Exception("Failed to parse settings JSON data for file %s" % self.filepath)
+            raise Exception(f"Failed to parse settings JSON data for file {self.filepath}")
 
         for key in self.settings:
             if "value" not in self.settings[key]:
@@ -220,8 +224,10 @@ class JSONSettingsHandler(object):
                 self.settings[key]["value"] = settings[key]["value"]
                 self.do_key_update(key)
             else:
-                print("Skipping key %s: the key does not exist in %s or has no value" % (key, filepath))
+                print(f"Skipping key {key}: the key does not exist in {filepath} or has no value")
         self.save_settings()
+        if self.notify_callback:
+            self.notify_callback(self, "", "")
 
     def save_to_file(self, filepath):
         if os.path.exists(filepath):
@@ -320,6 +326,7 @@ class JSONSettingsBackend(object):
 def json_settings_factory(subclass):
     class NewClass(globals()[subclass], JSONSettingsBackend):
         def __init__(self, key, settings, properties):
+            self.backend = "json"
             self.key = key
             self.settings = settings
 

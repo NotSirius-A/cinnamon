@@ -30,7 +30,7 @@ let _xkbInfo = null;
 
 function getXkbInfo() {
     if (_xkbInfo == null)
-        _xkbInfo = new CinnamonDesktop.XkbInfo();
+        _xkbInfo = CinnamonDesktop.XkbInfo.new_with_extras();
     return _xkbInfo;
 }
 
@@ -478,30 +478,11 @@ var InputSourceManager = class {
 
         this._currentSource = null;
 
-        this._kb_settings = new Gio.Settings({ schema_id: "org.cinnamon.desktop.keybindings.wm" });
         this._interface_settings = new Gio.Settings({ schema_id: "org.cinnamon.desktop.interface" });
 
-        global.display.add_keybinding(
-            'switch-input-source',
-            this._kb_settings,
-            Meta.KeyBindingFlags.NONE,
-            this._switchInputSource.bind(this)
-        );
-        global.display.add_keybinding(
-            'switch-input-source-backward',
-            this._kb_settings,
-            Meta.KeyBindingFlags.NONE,
-            this._switchInputSource.bind(this)
-        );
-        for (let i = 0; i <= 3; i++) {
-            const name = `switch-input-source-${i}`;
-            global.display.add_keybinding(
-                name,
-                this._kb_settings,
-                Meta.KeyBindingFlags.NONE,
-                () => this.activateInputSourceIndex(i)
-            );
-        }
+        this._kb_settings = new Gio.Settings({ schema_id: "org.cinnamon.desktop.keybindings.wm" });
+        this._setupKeybindings();
+        this._kb_settings.connect("changed", () => this._setupKeybindings());
 
         this._settings = new InputSourceSettings();
         this._settings.connect('input-sources-changed', this._inputSourcesChanged.bind(this));
@@ -518,7 +499,7 @@ var InputSourceManager = class {
         this._ibusManager.connect('property-updated', this._ibusPropertyUpdated.bind(this));
         this._ibusManager.connect('set-content-type', this._ibusSetContentType.bind(this));
 
-        global.display.connect('modifiers-accelerator-activated', this._modifiersSwitcher.bind(this));
+        global.display.connect('modifiers-accelerator-activated', () => this._modifiersSwitcher(false));
 
         this._sourcesPerWindow = false;
         this._focusWindowNotifyId = 0;
@@ -543,6 +524,19 @@ var InputSourceManager = class {
 
         this._ibusReady = ready;
         this._inputSourcesChanged();
+    }
+
+    _setupKeybindings() {
+        let kb = this._kb_settings.get_strv("switch-input-source");
+        Main.keybindingManager.addHotKeyArray("switch-input-source", kb, () => this._modifiersSwitcher(false));
+        kb = this._kb_settings.get_strv("switch-input-source-backward");
+        Main.keybindingManager.addHotKeyArray("switch-input-source-backward", kb, () => this._modifiersSwitcher(true));
+
+        for (let i = 0; i <= 3; i++) {
+            const name = `switch-input-source-${i}`;
+            kb = this._kb_settings.get_strv(name);
+            Main.keybindingManager.addHotKeyArray(name, kb, () => this.activateInputSourceIndex(i));
+        }
     }
 
     _modifiersSwitcher(reverse=false) {
@@ -578,11 +572,6 @@ var InputSourceManager = class {
         is = this._inputSources[nextIndex];
         is.activate();
         return true;
-    }
-
-    _switchInputSource(display, window, binding, action) {
-        const reversed = binding.get_name() === "switch-input-source-backward";
-        this._modifiersSwitcher(reversed);
     }
 
     _keyboardOptionsChanged() {
@@ -645,6 +634,11 @@ var InputSourceManager = class {
             this._ibusManager.setEngine(engine, releaseKeyboard);
         else
             this._ibusManager.setEngine(engine);
+
+        if (is.type == INPUT_SOURCE_TYPE_IBUS && (is.id === this._currentSource?.id)) {
+            this._ibusManager.refreshCurrentEngineProperties();
+        }
+
         this._currentInputSourceChanged(is);
     }
 
@@ -652,11 +646,15 @@ var InputSourceManager = class {
         let sources = this._settings.inputSources;
         let nSources = sources.length;
 
+        if (nSources == 0) {
+            this._settings.loadSystemLayouts();
+            return;
+        }
+
         let use_group_names = this._interface_settings.get_boolean("keyboard-layout-prefer-variant-names");
         let use_upper = this._interface_settings.get_boolean("keyboard-layout-use-upper");
         let show_flags = this._interface_settings.get_boolean("keyboard-layout-show-flags");
 
-        this._currentSource = null;
         this._inputSources = {};
         this._ibusSources = {};
 
@@ -710,13 +708,26 @@ var InputSourceManager = class {
         }
 
         if (infosList.length == 0) {
-            // We hit this *only* if the user reset/removed all layout entries from the 'sources' key.
-            // Exit here and do our first-run setup again.
-            GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                this._settings.loadSystemLayouts();
-            });
+            // If only an ibus source is defined at Cinnamon startup, ibus won't be loaded yet, pending
+            // a callback. We need to provide something temporarily to allow Cinnamon to finish initializine.
+            // Once ibus is loaded, _inputSourcesChanged will be called again.
+            let [exists, displayName, shortName, xkbLayout, variant] =
+                    this._xkbInfo.get_layout_info(DEFAULT_LAYOUT);
+            let flagName = xkbLayout;
+            if (!use_group_names) {
+                shortName = xkbLayout;
+            }
 
-            return;
+            infosList.push({
+                type: INPUT_SOURCE_TYPE_XKB,
+                id: DEFAULT_LAYOUT,
+                displayName,
+                shortName,
+                flagName,
+                xkbLayout,
+                variant,
+                prefs: ''
+            });
         }
 
         let inputSourcesDupeTracker = {};
@@ -935,7 +946,7 @@ var InputSourceManager = class {
     }
 
     get multipleSources() {
-        return this.numInputSources > 1;
+        return this.numInputSources > 1 || this.inputSources[0].type == INPUT_SOURCE_TYPE_IBUS;
     }
 
     get showFlags() {

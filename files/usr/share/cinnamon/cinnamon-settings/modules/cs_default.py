@@ -175,8 +175,8 @@ mimetypes["application/vnd.ms-excel"] = [
 ]
 
 removable_media_defs = [
-    ( "x-content/audio-cdda",       _("CD audio") ,     _("Select an application for audio CDs")),
-    ( "x-content/video-dvd",        _("DVD video"),     _("Select an application for video DVDs") ),
+    ( "x-content/audio-cdda",       _("Audio CD") ,     _("Select an application for audio CDs")),
+    ( "x-content/video-dvd",        _("Video DVD"),     _("Select an application for video DVDs") ),
     ( "x-content/audio-player",     _("Music player"),  _("Select an application to run when a music player is connected") ),
     ( "x-content/image-dcf",        _("Photos"),        _("Select an application to run when a camera is connected") ),
     ( "x-content/unix-software",    _("Software"),      _("Select an application for software CDs") )
@@ -187,19 +187,20 @@ other_defs = [
     # strings, just here to fix capitalization of the English originals.
     # If the shared-mime-info translation works for your language,
     # simply leave these untranslated.
-    ( "x-content/audio-dvd",        _("audio DVD") ),
-    ( "x-content/blank-bd",         _("blank Blu-ray disc") ),
-    ( "x-content/blank-cd",         _("blank CD disc") ),
-    ( "x-content/blank-dvd",        _("blank DVD disc") ),
-    ( "x-content/blank-hddvd",      _("blank HD DVD disc") ),
+    ( "x-content/audio-dvd",        _("Audio DVD") ),
+    ( "x-content/blank-bd",         _("Blank Blu-ray disc") ),
+    ( "x-content/blank-cd",         _("Blank CD disc") ),
+    ( "x-content/blank-dvd",        _("Blank DVD disc") ),
+    ( "x-content/blank-hddvd",      _("Blank HD DVD disc") ),
     ( "x-content/video-bluray",     _("Blu-ray video disc") ),
-    ( "x-content/ebook-reader",     _("e-book reader") ),
+    ( "x-content/ebook-reader",     _("E-book reader") ),
     ( "x-content/video-hddvd",      _("HD DVD video disc") ),
     ( "x-content/image-picturecd",  _("Picture CD") ),
     ( "x-content/video-svcd",       _("Super Video CD") ),
     ( "x-content/video-vcd",        _("Video CD") ),
     ( "x-content/win32-software",   _("Windows software") ),
-    ( "x-content/software",         _("Software") )
+    ( "x-content/software",         _("Software") ),
+    ( "x-content/ostree-repository", _("OSTree Software Updates") )
 ]
 
 class ColumnBox(Gtk.VBox):
@@ -207,7 +208,7 @@ class ColumnBox(Gtk.VBox):
         super(ColumnBox, self).__init__()
 
         label = Gtk.Label.new("")
-        label.set_markup('<b>%s\n</b>' % title)
+        label.set_markup(f'<b>{title}\n</b>')
         label.set_alignment(0.5, 0.5)
 
         self.set_homogeneous(False)
@@ -262,7 +263,7 @@ class DefaultAppChooserButton(Gtk.AppChooserButton):
         info = button.get_app_info()
 
         if info:
-            print("%s: " % info.get_name())
+            print(f"{info.get_name()}: ")
 
             supported_mimetypes = info.get_supported_types()
             hardcoded_mimetypes = None
@@ -276,24 +277,24 @@ class DefaultAppChooserButton(Gtk.AppChooserButton):
                 for t in sorted(supported_mimetypes):
                     if t.startswith(self.generic_content_type):
                         if info.set_as_default_for_type (t):
-                            print("  Set as default for supported %s" % t)
+                            print(f"  Set as default for supported {t}")
                             set_mimes.append(t)
                         else:
-                            print("  Failed to set as default application for '%s'" % t)
+                            print(f"  Failed to set as default application for '{t}'")
 
             # Also assign mimes hardcoded in the mimetypes hashtable
             if hardcoded_mimetypes is not None:
                 for t in sorted(hardcoded_mimetypes):
                     if t not in set_mimes:
                         if info.set_as_default_for_type (t):
-                            print("  Set as default for hardcoded %s" % t)
+                            print(f"  Set as default for hardcoded {t}")
                         else:
-                            print("  Failed to set as default application for '%s'" % t)
+                            print(f"  Failed to set as default application for '{t}'")
 
             #Web
             if self.content_type == "x-scheme-handler/http":
                 if not info.set_as_default_for_type("x-scheme-handler/https"):
-                    print("  Failed to set '%s' as the default application for '%s'" % (info.get_name(), "x-scheme-handler/https"))
+                    print(f"  Failed to set '{info.get_name()}' as the default application for 'x-scheme-handler/https'")
 
 class DefaultTerminalButton(Gtk.AppChooserButton):
     #TODO: See if we can get this to change the x-terminal-emulator default to allow it to be a more global change rather then just cinnamon/nemo
@@ -523,16 +524,15 @@ class OtherTypeDialog(Gtk.Dialog):
         description = None
         for d in other_defs:
             if content_type == d[DEF_CONTENT_TYPE]:
-                s = d[DEF_LABEL]
-                if s == _(s):
-                    description = Gio.content_type_get_description(content_type)
-                else:
-                    description = s
+                description = d[DEF_LABEL]
                 break
 
         if description is None:
-            print("Content type '%s' is missing from the info panel" % content_type)
-            return Gio.content_type_get_description(content_type)
+            try:
+                print(f"Content type '{content_type}' is missing from the info panel")
+                description = Gio.content_type_get_description(content_type).capitalize()
+            except Exception as e:
+                print(e)
 
         return description
 

@@ -303,6 +303,14 @@
       <description>Properties of hotcorners, in the form functionality:hover-enabled:hover-delay. The order in which properties are displayed is top left, top right, bottom left, bottom right.</description>
     </key>
 
+    <key name="hotcorner-fullscreen" type="b"> 
+      <default>false</default>
+      <summary>Enable hotcorners in fullscreen</summary>
+      <description>
+        Enable hotcorners in fullscreen
+      </description>
+    </key>
+
     <key name="panel-launchers" type="as">
       <default>["DEPRECATED"]</default>
       <summary>Obsolete - unused</summary>
@@ -321,7 +329,7 @@
     </key>
 
     <key name="favorite-apps" type="as">
-      <default>[ 'firefox.desktop', 'mintinstall.desktop', 'cinnamon-settings.desktop', 'hexchat.desktop', 'org.gnome.Terminal.desktop', 'nemo.desktop' ]</default>
+      <default>[ 'org.gnome.Calculator.desktop', 'org.gnome.Calendar.desktop', 'org.x.editor.desktop', 'mintinstall.desktop', 'cinnamon-settings.desktop' ]</default>
       <summary>List of desktop file IDs for favorite applications</summary>
       <description>
         The applications corresponding to these identifiers
@@ -350,6 +358,14 @@
       <summary>Display the Expo view as a grid</summary>
       <description>
         When enabled the Expo view will be displayed as a grid.
+      </description>
+    </key>
+
+    <key name="workspace-expo-primary-monitor" type="b">
+      <default>true</default>
+      <summary>Show the Expo view on the primary monitor</summary>
+      <description>
+        When enabled the Expo view will be displayed on the primary monitor rather than the current monitor.
       </description>
     </key>
 
@@ -410,7 +426,7 @@
     <key type="b" name="alttab-switcher-show-current-monitor">
       <default>false</default>
       <summary>Show windows from current monitor only</summary>
-    </key>  
+    </key>
 
     <key type="b" name="alttab-minimized-aware">
     <default>true</default>

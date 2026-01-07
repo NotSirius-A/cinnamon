@@ -39,9 +39,12 @@ class BinFileMonitor(GObject.GObject):
 
         for path in self.paths:
             file = Gio.File.new_for_path(path)
-            mon = file.monitor_directory(Gio.FileMonitorFlags.SEND_MOVED, None)
-            mon.connect("changed", self.queue_emit_changed)
-            self.monitors.append(mon)
+            try:
+                mon = file.monitor_directory(Gio.FileMonitorFlags.SEND_MOVED, None)
+                mon.connect("changed", self.queue_emit_changed)
+                self.monitors.append(mon)
+            except GLib.Error as e:
+                pass
 
     def _emit_changed(self):
         self.emit("changed")
@@ -475,7 +478,12 @@ class Keybinding(SettingsWidget):
         self.num_bind = num_bind
         self.kb_table = KeybindingTable.get_default()
         self.kb_label = label
-        self.keybinding = self.kb_table.find_keybinding_by_label(self.kb_label)
+
+        if self.backend == "gsettings":
+            self.keybinding = self.kb_table.lookup_gsettings_keybinding(self.settings.props.schema_id, self.key)
+        else:
+            self.keybinding = self.kb_table.lookup_json_keybinding(self.settings.uuid, self.settings.instance_id, self.key)
+
         self.keybinding.connect("changed", self.on_kb_table_entry_changed)
 
         self.label = SettingsLabel(label)
@@ -535,6 +543,7 @@ class Keybinding(SettingsWidget):
 def g_settings_factory(subclass):
     class NewClass(globals()[subclass], PXGSettingsBackend):
         def __init__(self, label, schema, key, *args, **kwargs):
+            self.backend = "gsettings"
             self.key = key
             if schema not in settings_objects:
                 settings_objects[schema] = Gio.Settings(schema_id=schema)

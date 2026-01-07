@@ -131,15 +131,16 @@ class MainWindow(object):
             proxy.highlightXlet('(ssb)', self.uuid, self.selected_instance["id"], True)
 
     def load_xlet_data (self):
-        self.xlet_dir = "/usr/share/cinnamon/%ss/%s" % (self.type, self.uuid)
+        self.xlet_dir = f"/usr/share/cinnamon/{self.type}s/{self.uuid}"
         if not os.path.exists(self.xlet_dir):
-            self.xlet_dir = "%s/.local/share/cinnamon/%ss/%s" % (home, self.type, self.uuid)
+            self.xlet_dir = f"{home}/.local/share/cinnamon/{self.type}s/{self.uuid}"
 
-        if os.path.exists("%s/metadata.json" % self.xlet_dir):
-            raw_data = open("%s/metadata.json" % self.xlet_dir).read()
-            self.xlet_meta = json.loads(raw_data)
+        if os.path.exists(f"{self.xlet_dir}/metadata.json"):
+            with open(f"{self.xlet_dir}/metadata.json") as f:
+                raw_data = f.read()
+                self.xlet_meta = json.loads(raw_data)
         else:
-            print("Could not find %s metadata for uuid %s - are you sure it's installed correctly?" % (self.type, self.uuid))
+            print(f"Could not find {self.type} metadata for uuid {self.uuid} - are you sure it's installed correctly?")
             quit()
 
     def build_window(self):
@@ -244,7 +245,7 @@ class MainWindow(object):
     def load_instances(self):
         self.instance_info = []
         path = Path(os.path.join(settings_dir, self.uuid))
-        old_path = Path("%s/.cinnamon/configs/%s" % (home, self.uuid))
+        old_path = Path(f"{home}/.cinnamon/configs/{self.uuid}")
         instances = 0
         new_items = os.listdir(path) if path.exists() else []
         old_items = os.listdir(old_path) if old_path.exists() else []
@@ -271,7 +272,7 @@ class MainWindow(object):
                     continue # multi-instance should have file names of the form [instance-id].json
 
                 instance_exists = False
-                enabled = self.gsettings.get_strv('enabled-%ss' % self.type)
+                enabled = self.gsettings.get_strv(f'enabled-{self.type}s')
                 for definition in enabled:
                     if self.uuid in definition and instance_id in definition.split(':'):
                         instance_exists = True
@@ -280,8 +281,9 @@ class MainWindow(object):
                 if not instance_exists:
                     continue
 
-            settings = JSONSettingsHandler(os.path.join(path if item in new_items else old_path, item), self.notify_dbus)
-            settings.instance_id = instance_id
+            settings = JSONSettingsHandler(
+                os.path.join(path if item in new_items else old_path, item), self.uuid, instance_id, self.notify_dbus
+            )
             instance_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             self.instance_stack.add_named(instance_box, instance_id)
 

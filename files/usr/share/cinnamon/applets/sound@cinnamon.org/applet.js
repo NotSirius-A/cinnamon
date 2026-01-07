@@ -100,7 +100,7 @@ class VolumeSlider extends PopupMenu.PopupSliderMenuItem {
 
         this.app_icon = app_icon;
         if (this.app_icon == null) {
-            this.iconName = this.isMic ? "microphone-sensitivity-muted" : "audio-volume-muted";
+            this.iconName = this.isMic ? "xsi-microphone-sensitivity-muted" : "xsi-audio-volume-muted";
             this.icon = new St.Icon({icon_name: this.iconName, icon_type: St.IconType.SYMBOLIC, icon_size: 16});
         }
         else {
@@ -257,7 +257,7 @@ class VolumeSlider extends PopupMenu.PopupSliderMenuItem {
             else
                 icon = "high";
         }
-        return this.isMic? "microphone-sensitivity-" + icon : "audio-volume-" + icon;
+        return this.isMic? "xsi-microphone-sensitivity-" + icon : "xsi-audio-volume-" + icon;
     }
 }
 
@@ -885,7 +885,8 @@ class Player extends PopupMenu.PopupMenuSection {
     _showCover(cover_path) {
         if (! cover_path || ! GLib.file_test(cover_path, GLib.FileTest.EXISTS)) {
             this.cover = new St.Icon({style_class: 'sound-player-generic-coverart', important: true, icon_name: "media-optical", icon_size: 300, icon_type: St.IconType.FULLCOLOR});
-            cover_path = null;
+            this._cover_path = null;
+            this._applet.setAppletTextIcon(this, null);
         }
         else {
             this._cover_path = cover_path;
@@ -1111,7 +1112,7 @@ class CinnamonSoundApplet extends Applet.TextIconApplet {
     }
 
     _setKeybinding() {
-        Main.keybindingManager.addHotKey("sound-open-" + this.instance_id, this.keyOpen, Lang.bind(this, this._openMenu));
+        Main.keybindingManager.addXletHotKey(this, "sound-open", this.keyOpen, Lang.bind(this, this._openMenu));
     }
 
     _on_overamplification_change () {
@@ -1141,7 +1142,7 @@ class CinnamonSoundApplet extends Applet.TextIconApplet {
     }
 
     on_applet_removed_from_panel () {
-        Main.keybindingManager.removeHotKey("sound-open-" + this.instance_id);
+        Main.keybindingManager.removeXletHotKey(this, "sound-open");
         if (this.hideSystray)
             this.unregisterSystrayIcons();
         if (this._iconTimeoutId) {
@@ -1299,7 +1300,7 @@ class CinnamonSoundApplet extends Applet.TextIconApplet {
             if (source === "output") {
                 // if we have an active player, but are changing the volume, show the output icon and after three seconds change back to the player icon unless muted
                 this.set_applet_icon_symbolic_name(this._outputIcon);
-                if (this.stream && !this.stream.is_muted) {
+                if (this._output && !this._output.is_muted) {
                     this._iconTimeoutId = Mainloop.timeout_add_seconds(OUTPUT_ICON_SHOW_TIME_SECONDS, () => {
                         this.setIcon();
                     });
@@ -1330,15 +1331,21 @@ class CinnamonSoundApplet extends Applet.TextIconApplet {
             this._icon_path = null;
         }
 
-        if (this.showalbum) {
-            if (path && player && (player === true || player._playerStatus == 'Playing')) {
-                this.setIcon(path, "player-path");
+        if (player && (player === true || player._playerStatus == 'Playing')) {
+            // Something is playing
+            if (this.showalbum) {
+                if (path) {
+                    this.setIcon(path, "player-path");
+                } else {
+                    this.setIcon('xsi-media-optical-cd-audio', 'player-name');
+                }
             } else {
-                this.setIcon('xsi-media-optical-cd-audio', 'player-name');
+                this.setIcon('xsi-audio-x-generic', 'player-name');
             }
-        }
-        else {
-            this.setIcon('xsi-audio-x-generic', 'player-name');
+        } else {
+            // Nothing is playing - clear player icon and show volume icon
+            this._playerIcon = [null, false];
+            this.setIcon(this._outputIcon);
         }
     }
 
@@ -1425,7 +1432,7 @@ class CinnamonSoundApplet extends Applet.TextIconApplet {
 
             this._changeActivePlayer(owner);
             this._updatePlayerMenuItems();
-            this.setAppletTextIcon();
+            this.setAppletTextIcon(this._players[this._activePlayer], true);
         }
     }
 
@@ -1434,7 +1441,7 @@ class CinnamonSoundApplet extends Applet.TextIconApplet {
             // The player exists, switch to it
             this._changeActivePlayer(owner);
             this._updatePlayerMenuItems();
-            this.setAppletTextIcon();
+            this.setAppletTextIcon(this._players[this._activePlayer], true);
         } else {
             // The player doesn't seem to exist. Remove it from the players list
             this._removePlayerItem(owner);
@@ -1470,7 +1477,7 @@ class CinnamonSoundApplet extends Applet.TextIconApplet {
                 }
             }
             this._updatePlayerMenuItems();
-            this.setAppletTextIcon();
+            this.setAppletTextIcon(this._players[this._activePlayer], true);
         }
     }
 
@@ -1580,6 +1587,9 @@ class CinnamonSoundApplet extends Applet.TextIconApplet {
         if (this.playerControl && this._activePlayer != null) {
             let menuItem = this._players[player];
             this.menu.addMenuItem(menuItem, 2);
+            this._icon_path = menuItem._cover_path || null;
+        } else {
+            this._icon_path = null;
         }
 
         this._updatePlayerMenuItems();

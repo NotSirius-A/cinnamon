@@ -148,7 +148,7 @@ class Module:
 
         section = power_page.add_section(_("Power options"))
 
-        lid_options, button_power_options, critical_options, can_suspend, can_hybrid_sleep, can_hibernate = get_available_options(self.up_client)
+        lid_options, button_power_options, critical_options, can_suspend, can_hybrid_sleep, can_hibernate = get_available_options()
 
         size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
 
@@ -245,7 +245,7 @@ class Module:
         try:
             brightness = proxy.GetPercentage()
         except GLib.Error as e:
-            print("Power module brightness page not available: %s" % e.message)
+            print(f"Power module brightness page not available: {e.message}")
 
             if self.show_battery_page:
                 self.sidePage.add_widget(self.sidePage.stack)
@@ -284,7 +284,7 @@ class Module:
             try:
                 brightness = proxy.GetPercentage()
             except GLib.Error as e:
-                print("Power module no keyboard backlight: %s" % e.message)
+                print(f"Power module no keyboard backlight: {e.message}")
             else:
                 section = page.add_section(_("Keyboard backlight"))
                 section.add_row(BrightnessSlider(section, proxy, _("Backlight brightness")))
@@ -408,7 +408,7 @@ class Module:
 
         desc = _("UPS")
         if model != "" or vendor != "":
-            desc = "%s %s" % (vendor, model)
+            desc = f"{vendor} {model}"
 
         widget = self.create_battery_row(device_id, "battery", desc, percentage, battery_level, details)
         return widget
@@ -453,7 +453,7 @@ class Module:
 
         desc = _("Battery")
         if model != "" or vendor != "":
-            desc = "%s %s" % (vendor, model)
+            desc = f"{vendor} {model}"
 
         widget = self.create_battery_row(device_id, "battery", desc, percentage, battery_level, details)
         return widget
@@ -498,7 +498,7 @@ class Module:
             desc = (_("Battery"))
 
         if model != "" or vendor != "":
-            desc = "%s %s" % (vendor, model)
+            desc = f"{vendor} {model}"
 
         widget = self.create_battery_row(device_id, icon_name, desc, percentage, battery_level)
         return widget
@@ -573,48 +573,27 @@ class Module:
         self.aliases[device_id] = entry.get_text()
         aliases = []
         for alias in self.aliases:
-            aliases.append("%s:=%s" % (alias, self.aliases[alias]))
+            aliases.append(f"{alias}:={self.aliases[alias]}")
         self.settings.set_strv("device-aliases", aliases)
 
 
-def get_available_options(up_client):
+def get_available_options():
     can_suspend = False
     can_hibernate = False
     can_hybrid_sleep = False
 
-    # Try logind first
+    # There's no reason this should ever fail as a normal user
     try:
-        connection = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
-        proxy = Gio.DBusProxy.new_sync(
-            connection,
-            Gio.DBusProxyFlags.NONE,
-            None,
-            "org.freedesktop.login1",
-            "/org/freedesktop/login1",
-            "org.freedesktop.login1.Manager",
-            None)
+        proxy = Gio.DBusProxy.new_for_bus_sync(
+                    Gio.BusType.SESSION,
+                    Gio.DBusProxyFlags.NONE,
+                    None,
+                    "org.gnome.SessionManager",
+                    "/org/gnome/SessionManager",
+                    "org.cinnamon.SessionManager.EndSessionDialog",
+                    None)
 
-        can_suspend = proxy.CanSuspend() == "yes"
-        can_hibernate = proxy.CanHibernate() == "yes"
-        can_hybrid_sleep = proxy.CanHybridSleep() == "yes"
-    except:
-        pass
-
-    # Next try ConsoleKit
-    try:
-        connection = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
-        proxy = Gio.DBusProxy.new_sync(
-            connection,
-            Gio.DBusProxyFlags.NONE,
-            None,
-            "org.freedesktop.ConsoleKit",
-            "/org/freedesktop/ConsoleKit/Manager",
-            "org.freedesktop.ConsoleKit.Manager",
-            None)
-
-        can_suspend = can_suspend or (proxy.CanSuspend() == "yes")
-        can_hibernate = can_hibernate or (proxy.CanHybridSleep() == "yes")
-        can_hybrid_sleep = can_hybrid_sleep or (proxy.CanHybridSleep() == "yes")
+        __, __, __, can_hybrid_sleep, can_suspend, can_hibernate, __ = proxy.GetCapabilities()
     except:
         pass
 
